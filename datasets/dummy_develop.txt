@@ -1,0 +1,7 @@
+<TRAIN	5	grain	wheat	corn>
+
+reported the 
+
+<TRAIN	6	corn	grain	wheat>
+
+crop registrations of grains

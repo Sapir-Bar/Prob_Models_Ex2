@@ -1,25 +1,59 @@
 import argparse
+import sys
+VOCAB_SIZE = 300000
 
-OUTPUT = []
+OUTPUT = [None] * 40
 
 def init():
-# process input: the program gets accept the following 4 arguments in this exact order:
-# < development set filename > < test set filename > < INPUT WORD > < output filename >
-# then write to the first sixth of Output array the following values: 
-# development set file name,  test set file name, INPUT WORD,  output file name, the language vocabulary size (300,000) and P_uniform. 
-# < development set filename > < test set filename > are .txt files. 
-# There are 2 lines for each article in the input files. The first one is the article header and the
-# second is the article itself. When developing and testing your model you should only consider
-# the article itself (and NOT its header line). 
-    pass
+    # process input: the program gets accept the following 4 arguments in this exact order:
+    # < development set filename > < test set filename > < INPUT WORD > < output filename >
+    # then write to the first sixth of Output array the following values: 
+    # development set file name,  test set file name, INPUT WORD,  output file name, the language vocabulary size (300,000) and P_uniform.
+    parser = argparse.ArgumentParser(description='Language Model Estimation')
+    parser.add_argument('dev_set', type=str, help='Path to the development set file')
+    parser.add_argument('test_set', type=str, help='Path to the test set file')
+    parser.add_argument('input_word', type=str, help='The word to estimate probability for')
+    parser.add_argument('output_file', type=str, help='Path to the output file')  
+    args = parser.parse_args()
+    # P_uniform = 1 / V
+    p_uniform = 1.0 / VOCAB_SIZE
+    # save values to array
+    OUTPUT[0] = args.dev_set
+    OUTPUT[1] = args.test_set
+    OUTPUT[2] = args.input_word
+    OUTPUT[3] = args.output_file
+    OUTPUT[4] = VOCAB_SIZE
+    OUTPUT[5] = p_uniform
+    return args
+    # < development set filename > < test set filename > are .txt files. 
+    # There are 2 lines for each article in the input files. The first one is the article header and the
+    # second is the article itself. When developing and testing your model you should only consider
+    # the article itself (and NOT its header line). 
 
-def development_set_preprocessing():
-# given the deveploment set path, compute the total number of events in the development set |S| (include repetition)
-# write to the 7_th item of Output this value
-# assume the words at the corpus are tokenized (seperated by space)
-# Consider the text as a sequence of events (words) that are separated by white spaces (usually a single space or a
-# new line). Basically everything between 2 white spaces is an event.
-    pass 
+
+def development_set_preprocessing(dev_set_path):
+    # given the deveploment set path, compute the total number of events in the development set |S| (include repetition)
+    # write to the 7_th item of Output this value
+    # assume the words at the corpus are tokenized (seperated by space)
+    # Consider the text as a sequence of events (words) that are separated by white spaces (usually a single space or a
+    # new line). Basically everything between 2 white spaces is an event.
+    all_events = []
+    try:
+        with open(dev_set_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            # iterate every 2 lines to skip headers
+            for i in range(2, len(lines), 4):
+                words = lines[i].strip().split()
+                all_events.extend(words)
+    except FileNotFoundError:
+        print(f"Error: File {dev_set_path} not found.")
+        sys.exit(1)
+    # save value to output
+    OUTPUT[6] = len(all_events)
+    print(len(all_events))
+    # return list of all events    
+    return all_events
+ 
 
 def Lidstone_model_training ():
     pass
@@ -86,7 +120,7 @@ def debug():
     # where p(x∗) is the probability of any unseen event and n0 is the number of such events.
     # where count(x) is the amount of apperances at the relevent training set 
 
-def evaluate():
+def evaluate(): pass
     # write to the 25th cell the total number of events in the test set (present at 2th cell).
     # writh to the 26th cell the perplexity of the lidstone model with optimum lambda on the test set
     # writh to the 27th cell the perplexity of the held out model 
@@ -103,21 +137,25 @@ def evaluate():
         # forth column: number of events of frequency r in the S^T of the development set.
         # fifth column: for each x\in S^T with frequency r, calculate the frequency of x at S^H. sum over all x. 
 
-def print():
-    # Your output file should include exactly the following lines, in the following order. Each
-    #  line should be tab delimited (i.e. a tab character between every two strings).
-    #Students <student1 name> <student1 id> <student2 name> <student2 id>
-    #Output1 < value >
-    #  ...
-    #Output28 < value >
-    #Output29
-    #<10 lines of the table described in Output29>
-    # Output number values containing an exponent symbol (‘e’) may appear in either uppercase
-    # or lowercase. E.g. both 1.1111111e6 and 1.1111111E6 are acceptable.
-    # print the values based on OUTPUT array. 
-    # print to outputfile (present at 4th cell).
+
+def write_to_file(): pass
+# Your output file should include exactly the following lines, in the following order. Each
+#  line should be tab delimited (i.e. a tab character between every two strings).
+#Students <student1 name> <student1 id> <student2 name> <student2 id>
+#Output1 < value >
+#  ...
+#Output28 < value >
+#Output29
+#<10 lines of the table described in Output29>
+# Output number values containing an exponent symbol (‘e’) may appear in either uppercase
+# or lowercase. E.g. both 1.1111111e6 and 1.1111111E6 are acceptable.
+# print the values based on OUTPUT array. 
+# print to outputfile (present at 4th cell).
+    
 
 
-
-
+if __name__ == "__main__":
+    args = init()
+    print(args)
+    dev_set = development_set_preprocessing(args.dev_set)
 
