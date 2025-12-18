@@ -144,12 +144,22 @@ def unigram_prob_held_out(word, counts_train, n_r, t_r, size_h):
     r = counts_train[word]  # find r of 'word'
     return t_r[r] / (n_r[r] * size_h)  # return p (x=word)
 
-def debug():
-    pass
+def debug(p_unseen, n0, seen_probs):
     # make sure the probabilities are summed up to 1 at the lidstone and held out models. 
     # equation: $p(x^{*})\, n_{0} + \sum_{x : \operatorname{count}(x) > 0} p(x) = 1$
     # where p(x∗) is the probability of any unseen event and n0 is the number of such events.
-    # where count(x) is the amount of apperances at the relevent training set 
+    # where count(x) is the amount of apperances at the relevent training set
+
+    # calculate sum of prbabilities for seen words
+    sum_seen = sum(seen_probs)
+    # calculate sum of all probailities
+    total_prob = (p_unseen * n0) + sum_seen
+    print("total probabilities sum up to:", total_prob)
+    # make sure sum==1 (with round of 9 floating digits)
+    is_valid = abs(total_prob - 1.0) < 1e-9
+    if not is_valid:
+        print(f"Warning: Model probabilities sum to {total_prob} instead of 1.0")
+    return is_valid
 
 def evaluate(): pass
     # write to the 25th cell the total number of events in the test set (present at 2th cell).
@@ -190,5 +200,13 @@ if __name__ == "__main__":
     print(args)
     dev_set = development_set_preprocessing(args.dev_set)
     counts_train, n_r, t_r, ho_set_len = held_out_model_training(dev_set, args.input_word)
+
+    # degug held-out unigram model
+    n0 = VOCAB_SIZE - len(counts_train)
+    p_unseen = unigram_prob_held_out('unseen-word', counts_train, n_r, t_r, ho_set_len)
+    seen_probs = [unigram_prob_held_out(word, counts_train, n_r, t_r, ho_set_len) 
+                for word in counts_train]
+
+    debug(p_unseen, n0, seen_probs)
 
 
