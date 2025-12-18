@@ -1,5 +1,7 @@
 import argparse
+from collections import Counter
 import sys
+
 VOCAB_SIZE = 300000
 
 OUTPUT = [None] * 40
@@ -75,19 +77,47 @@ def Lidstone_model_training ():
     # cell call to grid search (assign to the 19th cell the optimum λ).
     # write the the 20th the value return from calculate_perplexity with the optimum lambda. 
 
-def held_out_model_training():
-    pass
-    # Split the development set into exactly 2 halves.
+def held_out_model_training(all_events, input_word):
+    # Split the development set into exactly 2 halfes.
+    half = len(all_events) // 2
+    training_set = all_events[:half]
+    held_out_set = all_events[half:]
     # write to the 21 cell the number of events in the first halve (include repetition). mark: S^T, training set
     # write to the 22 cell the number of events in the second halve (include repetition). mark: S^H, held-out set
+    OUTPUT[20] = len(training_set)
+    OUTPUT[21] = len(held_out_set)
     # call calculate_held_out_parameters.
+    counts_train = Counter(training_set)  # calculate counts of events in S^T
+    counts_held_out = Counter(held_out_set)  # calculate counts of events in S^H
+    n_r, t_r = calculate_held_out_parameters(counts_train, counts_held_out)
     # write to the 23th P(Event = INPUT WORD) as estimated by the unigram with held out smoothing model.
+    prob_input = unigram_prob_held_out(input_word, counts_train, n_r, t_r, len(held_out_set))
+    OUTPUT[22] = prob_input
+    print(f"{input_word} probabiliry: {prob_input}" )
     # write to the 24th P(Event = 'unseen word') as estimated by unigram with held out smoothing model.
-    
-def calculate_held_out_parameters():
-    pass
+    prob_unseen = unigram_prob_held_out('unseen-word', counts_train, n_r, t_r, len(held_out_set))
+    OUTPUT[23] = prob_unseen
+    print(f"unseen-word probabiliry: {prob_unseen}" )
+    return counts_train, n_r, t_r, len(held_out_set)
+
+def calculate_held_out_parameters(counts_train, counts_held_out):
     # The equation: 
     # $p_{H_0}(x : c_T(x) = r) = \frac{t_r / N_r}{|H|} = \frac{\sum_{x : c_T(x) = r} c_H(x)}{N_r |H|}$
+    n_r = Counter()
+    t_r = Counter()
+    # define n_0
+    n_r[0] = VOCAB_SIZE - len(counts_train)
+    t_0 = 0
+    # calculate t_0
+    for word, count in counts_held_out.items():
+        if word not in counts_train:
+            t_0 += count
+    t_r[0] = t_0
+    # calculate t_r
+    for word, r in counts_train.items():
+        n_r[r] += 1
+        t_r[r] += counts_held_out[word]
+    return n_r, t_r
 
 def calculate_perplexity():
     pass
@@ -110,8 +140,9 @@ def unigram_prob_lidstone():
     pass
     # given a specific lambda and the training set, calculate the prob of word x 
 
-def unigram_prob_held_out():
-    pass
+def unigram_prob_held_out(word, counts_train, n_r, t_r, size_h):
+    r = counts_train[word]  # find r of 'word'
+    return t_r[r] / (n_r[r] * size_h)  # return p (x=word)
 
 def debug():
     pass
@@ -158,4 +189,6 @@ if __name__ == "__main__":
     args = init()
     print(args)
     dev_set = development_set_preprocessing(args.dev_set)
+    counts_train, n_r, t_r, ho_set_len = held_out_model_training(dev_set, args.input_word)
+
 
