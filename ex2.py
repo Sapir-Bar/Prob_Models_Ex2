@@ -179,19 +179,43 @@ def evaluate(): pass
         # fifth column: for each x\in S^T with frequency r, calculate the frequency of x at S^H. sum over all x. 
 
 
-def write_to_file(): pass
-# Your output file should include exactly the following lines, in the following order. Each
-#  line should be tab delimited (i.e. a tab character between every two strings).
-#Students <student1 name> <student1 id> <student2 name> <student2 id>
-#Output1 < value >
-#  ...
-#Output28 < value >
-#Output29
-#<10 lines of the table described in Output29>
-# Output number values containing an exponent symbol (‘e’) may appear in either uppercase
-# or lowercase. E.g. both 1.1111111e6 and 1.1111111E6 are acceptable.
-# print the values based on OUTPUT array. 
-# print to outputfile (present at 4th cell).
+def write_to_file():
+    # Your output file should include exactly the following lines, in the following order. Each
+    #  line should be tab delimited (i.e. a tab character between every two strings).
+    #Students <student1 name> <student1 id> <student2 name> <student2 id>
+    #Output1 < value >
+    #  ...
+    #Output28 < value >
+    #Output29
+    #<10 lines of the table described in Output29>
+    # Output number values containing an exponent symbol (‘e’) may appear in either uppercase
+    # or lowercase. E.g. both 1.1111111e6 and 1.1111111E6 are acceptable.
+    # print the values based on OUTPUT array. 
+    # print to outputfile (present at 4th cell).
+    output_filename = OUTPUT[3]  # נתיב הקובץ מ-Output4 [cite: 40]
+    
+    with open(output_filename, 'w', encoding='utf-8') as f:
+        # שורת הסטודנטים מופרדת בטאבים [cite: 105]
+        # החלף את הפרטים בפרטי האמת שלכם
+        f.write("#Students\tStudent_Name1\tID1\tStudent_Name2\tID2\n")
+        
+        # כתיבת Output1 עד Output28 [cite: 103, 106]
+        for i in range(28):
+            label = f"#Output{i+1}"
+            value = OUTPUT[i]
+            # שימוש בפורמט טאב להפרדה 
+            f.write(f"{label}\t{value}\n")
+            
+        # כתיבת כותרת הטבלה Output29 [cite: 107]
+        f.write("#Output29\n")
+        
+        # כתיבת 10 שורות הטבלה (r=0 עד r=9) [cite: 108]
+        # הטבלה צריכה להישמר ב-OUTPUT[28] כמטריצה (רשימה של רשימות)
+        # if OUTPUT[28] is not None:
+        #     for row in OUTPUT[28]:
+        #         # עיגול ל-5 ספרות אחרי הנקודה וחיבור עם טאבים [cite: 89-90]
+        #         formatted_row = "\t".join([f"{x:.5f}" if isinstance(x, float) else str(x) for x in row])
+        #         f.write(f"{formatted_row}\n")
     
 
 
@@ -208,5 +232,5 @@ if __name__ == "__main__":
                 for word in counts_train]
 
     debug(p_unseen, n0, seen_probs)
-
+    write_to_file()
 
