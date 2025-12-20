@@ -1,236 +1,319 @@
 import argparse
-from collections import Counter
+import math
 import sys
+from collections import Counter, defaultdict
+from typing import Dict, Iterable, List, Tuple
 
+OUT = [None] * 28  # Outputs array corresponds to Output1..Output28 (indices 0..27)
 VOCAB_SIZE = 300000
 
-OUTPUT = [None] * 40
-
-def init():
-    # process input: the program gets accept the following 4 arguments in this exact order:
-    # < development set filename > < test set filename > < INPUT WORD > < output filename >
-    # then write to the first sixth of Output array the following values: 
-    # development set file name,  test set file name, INPUT WORD,  output file name, the language vocabulary size (300,000) and P_uniform.
-    parser = argparse.ArgumentParser(description='Language Model Estimation')
-    parser.add_argument('dev_set', type=str, help='Path to the development set file')
-    parser.add_argument('test_set', type=str, help='Path to the test set file')
-    parser.add_argument('input_word', type=str, help='The word to estimate probability for')
-    parser.add_argument('output_file', type=str, help='Path to the output file')  
-    args = parser.parse_args()
-    # P_uniform = 1 / V
-    p_uniform = 1.0 / VOCAB_SIZE
-    # save values to array
-    OUTPUT[0] = args.dev_set
-    OUTPUT[1] = args.test_set
-    OUTPUT[2] = args.input_word
-    OUTPUT[3] = args.output_file
-    OUTPUT[4] = VOCAB_SIZE
-    OUTPUT[5] = p_uniform
-    return args
-    # < development set filename > < test set filename > are .txt files. 
-    # There are 2 lines for each article in the input files. The first one is the article header and the
-    # second is the article itself. When developing and testing your model you should only consider
-    # the article itself (and NOT its header line). 
-
-
-def development_set_preprocessing(dev_set_path):
-    # given the deveploment set path, compute the total number of events in the development set |S| (include repetition)
-    # write to the 7_th item of Output this value
-    # assume the words at the corpus are tokenized (seperated by space)
-    # Consider the text as a sequence of events (words) that are separated by white spaces (usually a single space or a
-    # new line). Basically everything between 2 white spaces is an event.
-    all_events = []
+def development_set_preprocessing(path: str) -> List[str]:
+    """
+    Read events from a corpus file at the following format:
+      - 4 lines per article: header line, newline ('\n'), article text line, newline ('\n')
+    We ignore header lines as well as newline lines and return a flat list of tokens (events) from article text lines only.
+    """
+    events: List[str] = []
     try:
-        with open(dev_set_path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-            # iterate every 2 lines to skip headers
             for i in range(2, len(lines), 4):
-                words = lines[i].strip().split()
-                all_events.extend(words)
+                events.extend(lines[i].strip().split())
     except FileNotFoundError:
-        print(f"Error: File {dev_set_path} not found.")
+        print(f"Error: File not found: {path}", file=sys.stderr)
         sys.exit(1)
-    # save value to output
-    OUTPUT[6] = len(all_events)
-    print(len(all_events))
-    # return list of all events    
-    return all_events
- 
+    return events
 
-def Lidstone_model_training ():
-    pass
-    # Step 1: (internal function)
-    # split the development set into a training set with exactly the first
-    # 90% of the words in S (should contain the first (round(0.9 ∗|S|)) words and a validation
-    # set with the rest 10% of the words.
+# ---------------------------
+# Unigram probabilities
+# ---------------------------
+def mle_prob(word: str, counts: Counter, N: int) -> float:
+    """Unigram MLE: p(x)=c(x)/N."""
+    if N == 0: # empty training set
+        return 0.0
+    return counts.get(word, 0) / N
 
-    # write to 8_th and 9_th cells the number of events in the validation set and training set, appropriately. 
-    # write to 10_th cell the number of different events at training set
-    # write to the 11_th cell the number of times the event INPUT WORD appears in the training set
-    # write to the 12_th cell the Maximum Likelihood Estimate of INPUT WORD using unigram_prob
-    # write to the 13_cell the Maximum Likelihood Estimate of 'unseen-word' using unigram_prob
-    # write to the 14th cell the P(Event = INPUT WORD) as estimated by your model using λ = 0.10 (call unigram_prob_lidstone)
-    # write to the 15th cell the P(Event = 'unseen-word') as estimated by your model using λ = 0.10 (call unigram_prob_lidstone)
-    # write to the 16th cell the perplexity on the validation set using λ = 0.01 (call calculate_perplexity)
-    # write to the 17th cell the perplexity on the validation set using λ = 0.10 (call calculate_perplexity)
-    # write to the 18th cell the perplexity on the validation set using λ = 1.00 (call calculate_perplexity)
-    # cell call to grid search (assign to the 19th cell the optimum λ).
-    # write the the 20th the value return from calculate_perplexity with the optimum lambda. 
 
-def held_out_model_training(all_events, input_word):
-    # Split the development set into exactly 2 halfes.
-    half = len(all_events) // 2
-    training_set = all_events[:half]
-    held_out_set = all_events[half:]
-    # write to the 21 cell the number of events in the first halve (include repetition). mark: S^T, training set
-    # write to the 22 cell the number of events in the second halve (include repetition). mark: S^H, held-out set
-    OUTPUT[20] = len(training_set)
-    OUTPUT[21] = len(held_out_set)
-    # call calculate_held_out_parameters.
-    counts_train = Counter(training_set)  # calculate counts of events in S^T
-    counts_held_out = Counter(held_out_set)  # calculate counts of events in S^H
-    n_r, t_r = calculate_held_out_parameters(counts_train, counts_held_out)
-    # write to the 23th P(Event = INPUT WORD) as estimated by the unigram with held out smoothing model.
-    prob_input = unigram_prob_held_out(input_word, counts_train, n_r, t_r, len(held_out_set))
-    OUTPUT[22] = prob_input
-    print(f"{input_word} probabiliry: {prob_input}" )
-    # write to the 24th P(Event = 'unseen word') as estimated by unigram with held out smoothing model.
-    prob_unseen = unigram_prob_held_out('unseen-word', counts_train, n_r, t_r, len(held_out_set))
-    OUTPUT[23] = prob_unseen
-    print(f"unseen-word probabiliry: {prob_unseen}" )
-    return counts_train, n_r, t_r, len(held_out_set)
+def lidstone_prob(word: str, counts: Counter, N: int, lam: float, V: int = VOCAB_SIZE) -> float:
+    """
+    Lidstone smoothing:
+        p_lid(x) = (c(x)+lam) / (N + lam*V)
+    For unseen x: c(x)=0 -> lam/(N+lam*V)
+    """
+    denom = N + lam * V
+    if denom == 0:
+        return 0.0
+    return (counts.get(word, 0) + lam) / denom
 
-def calculate_held_out_parameters(counts_train, counts_held_out):
-    # The equation: 
-    # $p_{H_0}(x : c_T(x) = r) = \frac{t_r / N_r}{|H|} = \frac{\sum_{x : c_T(x) = r} c_H(x)}{N_r |H|}$
-    n_r = Counter()
-    t_r = Counter()
-    # define n_0
-    n_r[0] = VOCAB_SIZE - len(counts_train)
-    t_0 = 0
-    # calculate t_0
-    for word, count in counts_held_out.items():
-        if word not in counts_train:
-            t_0 += count
-    t_r[0] = t_0
-    # calculate t_r
-    for word, r in counts_train.items():
+
+def heldout_parameters(train_counts: Counter, heldout_counts: Counter, V: int = VOCAB_SIZE) -> Tuple[Dict[int, int], Dict[int, int]]:
+    """
+    Compute N_r and t_r for held-out estimation:
+      N_r = number of types with c_T(x)=r (unique tokens)
+      t_r = sum_{x: c_T(x)=r} c_H(x)
+    """
+    n_r: Dict[int, int] = defaultdict(int)
+    t_r: Dict[int, int] = defaultdict(int)
+
+    # r=0: types not seen in training
+    n_r[0] = V - len(train_counts)
+    t0 = 0
+    for w, ch in heldout_counts.items():
+        if w not in train_counts:
+            t0 += ch
+    t_r[0] = t0
+
+    # r>0: types seen in training
+    for w, r in train_counts.items():
         n_r[r] += 1
-        t_r[r] += counts_held_out[word]
+        t_r[r] += heldout_counts.get(w, 0)
+
     return n_r, t_r
 
-def calculate_perplexity():
-    pass
-    # given a specific lambda, calculate the model perplexity on the validation set.
 
-def grid_search():
-    pass
-    # search for lambda value minimize the perplexity on the validation set
-    # lambda is at the range [0, 2]. λ values should be specified up to two digits after the decimal point 
-    # at loop, call to calculate_perplexity with the current λ
-    # write to the 19th cell the λ that minimizes the perplexity
+def heldout_prob(word: str, train_counts: Counter, n_r: Dict[int, int], t_r: Dict[int, int], H_size: int) -> float:
+    """
+    Held-out unigram probability:
+        p_H(x) = t_r[r] / (N_r[r] * |H|), where r=c_T(x).
+    """
+    r = train_counts.get(word, 0)
+    return t_r.get(r, 0) / (n_r.get(r, 0) * H_size)
 
-def unigram_prob():
-    pass
-    # according to MLE based on the training set for word x
-    # equation: f(x) / N. 
-    # where N is the Output 9th cell. 
 
-def unigram_prob_lidstone():
-    pass
-    # given a specific lambda and the training set, calculate the prob of word x 
+# ---------------------------
+# Perplexity
+# ---------------------------
+def perplexity_unigram(events: List[str], prob_fn) -> float:
+    """
+    Perplexity = exp( - (1/n) * sum_i log p(w_i) )
+    Uses natural logs; equivalent to any other log base.
+    If any p(w_i)==0 => perplexity = inf.
+    """
+    n = len(events) # Validation set size
+    if n == 0:
+        return float("inf")
+    log_sum = 0.0
+    for w in events:
+        p = prob_fn(w)
+        if p <= 0.0:
+            return float("inf")
+        log_sum += math.log(p)
+    return math.exp(-log_sum / n)
 
-def unigram_prob_held_out(word, counts_train, n_r, t_r, size_h):
-    r = counts_train[word]  # find r of 'word'
-    return t_r[r] / (n_r[r] * size_h)  # return p (x=word)
 
-def debug(p_unseen, n0, seen_probs):
-    # make sure the probabilities are summed up to 1 at the lidstone and held out models. 
-    # equation: $p(x^{*})\, n_{0} + \sum_{x : \operatorname{count}(x) > 0} p(x) = 1$
-    # where p(x∗) is the probability of any unseen event and n0 is the number of such events.
-    # where count(x) is the amount of apperances at the relevent training set
+# ---------------------------
+# Splits and search
+# ---------------------------
+def split_90_10(events: List[str]) -> Tuple[List[str], List[str]]:
+    """Train = first round(0.9*|S|) events, Validation = rest."""
+    cut = int(round(0.9 * len(events)))
+    return events[:cut], events[cut:]
 
-    # calculate sum of prbabilities for seen words
+
+def grid_search_lambda(train_counts: Counter, train_size: int, validation: List[str], V: int = VOCAB_SIZE) -> Tuple[float, float]:
+    """
+    Search lambda in [0, 2] with step 0.01, pick lambda with minimal validation perplexity.
+    Returns: (best_lambda, best_perplexity)
+    """
+    best_lam = 0.0
+    best_pp = float("inf")
+    for i in range(0, 201):  # 0.00..2.00
+        lam = i / 100.0
+        pp = perplexity_unigram(validation, lambda w: lidstone_prob(w, train_counts, train_size, lam, V))
+        if pp < best_pp:
+            best_pp = pp
+            best_lam = lam
+    return best_lam, best_pp
+
+
+# ---------------------------
+# Debug mass check
+# ---------------------------
+def debug(p_unseen: float, n0: int, seen_probs: Iterable[float]) -> float:
+    """Return total probability mass: p_unseen*n0 + sum_{seen} p(x)."""
     sum_seen = sum(seen_probs)
-    # calculate sum of all probailities
     total_prob = (p_unseen * n0) + sum_seen
-    print("total probabilities sum up to:", total_prob)
-    # make sure sum==1 (with round of 9 floating digits)
-    is_valid = abs(total_prob - 1.0) < 1e-9
-    if not is_valid:
-        print(f"Warning: Model probabilities sum to {total_prob} instead of 1.0")
-    return is_valid
+    return total_prob
 
-def evaluate(): pass
-    # write to the 25th cell the total number of events in the test set (present at 2th cell).
-    # writh to the 26th cell the perplexity of the lidstone model with optimum lambda on the test set
-    # writh to the 27th cell the perplexity of the held out model 
-    # write to the 28th cell 'L' whether the perplexity if lidstone is lower than held out. otherwise, write 'H'. 
-    # write to the 29cell the following table: 
-    # Intructions:
-        # Numbers in each row should be tab delimited (i.e. separated by a tab character). Round your results in this table to
-        # 5 digits after the decimal point.
-        # Don't write the header column. 
-        # first column: r values denote event frequencies in the training corpus (r \in [0, 9])
-        # second column: for each x \in test set, estimate the frequency according p(x) * |training_set|
-        # calculate expected frequency over all the x \in test set. 
-        # third column: same for the the held out estimation. 
-        # forth column: number of events of frequency r in the S^T of the development set.
-        # fifth column: for each x\in S^T with frequency r, calculate the frequency of x at S^H. sum over all x. 
+# ---------------------------
+# Output29 table
+# ---------------------------
+def build_table_29(
+    train_size: int,
+    N_ST: int,
+    N_SH: int,
+    n_r: Dict[int, int],
+    t_r: Dict[int, int],
+    best_lambda: float,
+    V: int = VOCAB_SIZE,
+) -> List[List[float]]:
+    """
+    Build Output29 rows for r=0..9:
+      r, fMLE, fλ, fH, NTr, tr
+
+    We follow the exercise description:
+      - r is the frequency in S^T (the held-out training half)
+      - fMLE: expected frequency under MLE on the same corpus -> equals r
+      - fλ: expected frequency under Lidstone(best λ) for a word with count r in the same corpus
+      - fH: expected frequency under held-out for a word with count r (depends only on r)
+      - NTr: N_r from held-out (computed on S^T)
+      - tr:  t_r from held-out
+    """
+    rows: List[List[float]] = []
+
+    for r in range(0, 10):
+        f_mle = float(r)
+
+        # Lidstone expected frequency for any word with count r in the training corpus
+        p_lid = (r + best_lambda) / (train_size + best_lambda * V)
+        f_lid = p_lid * train_size
+
+        # Held-out expected frequency depends only on r via t_r and N_r
+        ntr = n_r.get(r, 0)
+        tr = t_r.get(r, 0)
+        p_ho = tr / (ntr * N_SH) 
+        f_ho = p_ho * N_ST
+
+        rows.append([f_mle, f_lid, f_ho, ntr, tr])
+
+    return rows
 
 
-def write_to_file():
-    # Your output file should include exactly the following lines, in the following order. Each
-    #  line should be tab delimited (i.e. a tab character between every two strings).
-    #Students <student1 name> <student1 id> <student2 name> <student2 id>
-    #Output1 < value >
-    #  ...
-    #Output28 < value >
-    #Output29
-    #<10 lines of the table described in Output29>
-    # Output number values containing an exponent symbol (‘e’) may appear in either uppercase
-    # or lowercase. E.g. both 1.1111111e6 and 1.1111111E6 are acceptable.
-    # print the values based on OUTPUT array. 
-    # print to outputfile (present at 4th cell).
-    output_filename = OUTPUT[3]  # נתיב הקובץ מ-Output4 [cite: 40]
-    
-    with open(output_filename, 'w', encoding='utf-8') as f:
-        # שורת הסטודנטים מופרדת בטאבים [cite: 105]
-        # החלף את הפרטים בפרטי האמת שלכם
+# ---------------------------
+# Writing output
+# ---------------------------
+def write_output(path: str, outputs: List, table: List[List[float]]) -> None:
+    """
+    Output file format (tab-delimited):
+      #Students <student1 name> <student1 id> <student2 name> <student2 id>
+      #Output1 <value>
+      ...
+      #Output28 <value>
+      #Output29
+      <10 lines of table: r=0..9, each row tab-delimited, rounded to 5 decimals>
+    """
+    with open(path, "w", encoding="utf-8") as f:
+        # TODO: replace with your real details
         f.write("#Students\tStudent_Name1\tID1\tStudent_Name2\tID2\n")
-        
-        # כתיבת Output1 עד Output28 [cite: 103, 106]
-        for i in range(28):
-            label = f"#Output{i+1}"
-            value = OUTPUT[i]
-            # שימוש בפורמט טאב להפרדה 
-            f.write(f"{label}\t{value}\n")
-            
-        # כתיבת כותרת הטבלה Output29 [cite: 107]
-        f.write("#Output29\n")
-        
-        # כתיבת 10 שורות הטבלה (r=0 עד r=9) [cite: 108]
-        # הטבלה צריכה להישמר ב-OUTPUT[28] כמטריצה (רשימה של רשימות)
-        # if OUTPUT[28] is not None:
-        #     for row in OUTPUT[28]:
-        #         # עיגול ל-5 ספרות אחרי הנקודה וחיבור עם טאבים [cite: 89-90]
-        #         formatted_row = "\t".join([f"{x:.5f}" if isinstance(x, float) else str(x) for x in row])
-        #         f.write(f"{formatted_row}\n")
-    
 
+        for i in range(28):
+            f.write(f"#Output{i+1}\t{outputs[i]}\n")
+
+        f.write("#Output29\n")
+        for row in table:
+            f.write(
+                "\t".join(
+                    f"{x:.5f}" if i in (1, 2) else str(int(x))
+                    for i, x in enumerate(row)
+                ) + "\n"
+)
+
+
+# ---------------------------
+# Main
+# ---------------------------
+def main() -> None:
+
+    parser = argparse.ArgumentParser(description="Smoothing methods for Unigram model")
+    parser.add_argument("dev_set", type=str, help="Path to development set file")
+    parser.add_argument("test_set", type=str, help="Path to test set file")
+    parser.add_argument("input_word", type=str, help="Word to estimate probability for")
+    parser.add_argument("output_file", type=str, help="Path to output file")
+    args = parser.parse_args()
+
+    OUT[0] = args.dev_set
+    OUT[1] = args.test_set
+    OUT[2] = args.input_word
+    OUT[3] = args.output_file
+    OUT[4] = VOCAB_SIZE
+    OUT[5] = 1.0 / VOCAB_SIZE  # uniform
+
+    # Read development events, ignoring headers
+    dev_events = development_set_preprocessing(args.dev_set)
+    OUT[6] = len(dev_events)  # Output7
+
+    # Lidstone: 90/10 split, lambda selection
+    train, validation = split_90_10(dev_events)
+    OUT[7] = len(validation)  # Output8
+    OUT[8] = len(train)  # Output9
+
+    counts = Counter(train)               # Counts how many times each token appears
+    train_size = len(train)               # Total number of tokens in the training set
+    OUT[9] = len(counts)                     # Output10: observed vocab size
+    OUT[10] = counts.get(args.input_word, 0) # Output11: count of input_word in the training set
+
+    # Output12/13: MLE probabilities
+    OUT[11] = mle_prob(args.input_word, counts, train_size)
+    OUT[12] = mle_prob("unseen-word", counts, train_size)
+
+    # Output14/15: Lidstone probabilities with lambda=0.10
+    OUT[13] = lidstone_prob(args.input_word, counts, train_size, 0.10, VOCAB_SIZE)
+    OUT[14] = lidstone_prob("unseen-word", counts, train_size, 0.10, VOCAB_SIZE)
+
+    # Output16/17/18: validation perplexities for lambda in {0.01,0.10,1.00}
+    OUT[15] = perplexity_unigram(validation, lambda w: lidstone_prob(w, counts, train_size, 0.01, VOCAB_SIZE))
+    OUT[16] = perplexity_unigram(validation, lambda w: lidstone_prob(w, counts, train_size, 0.10, VOCAB_SIZE))
+    OUT[17] = perplexity_unigram(validation, lambda w: lidstone_prob(w, counts, train_size, 1.00, VOCAB_SIZE))
+
+    # Output19/20: best lambda and its minimized perplexity on validation
+    best_lam, best_pp = grid_search_lambda(counts, train_size, validation, VOCAB_SIZE)
+    OUT[18] = best_lam
+    OUT[19] = best_pp
+
+    # ------------------
+    # Held-out: split dev into halves
+    # ------------------
+    half = len(dev_events) // 2
+    S_T = dev_events[:half]
+    S_H = dev_events[half:]
+    OUT[20] = len(S_T)  # Output21
+    OUT[21] = len(S_H)  # Output22
+
+    counts_ST = Counter(S_T)
+    counts_SH = Counter(S_H)
+    n_r, t_r = heldout_parameters(counts_ST, counts_SH, VOCAB_SIZE)
+
+    OUT[22] = heldout_prob(args.input_word, counts_ST, n_r, t_r, len(S_H))   # Output23
+    OUT[23] = heldout_prob("unseen-word", counts_ST, n_r, t_r, len(S_H))     # Output24
+
+    # ------------------
+    # Debug: probability mass sums to 1 (prints to stderr; doesn't affect output format)
+    # ------------------
+    # Lidstone (best lambda) mass over the 90% training corpus:
+    n0_lid = VOCAB_SIZE - len(counts)
+    p_unseen_lid = lidstone_prob("unseen-word", counts, train_size, best_lam, VOCAB_SIZE)
+    seen_probs_lid = (lidstone_prob(w, counts, train_size, best_lam, VOCAB_SIZE) for w in counts.keys())
+    print(f"[debug] Lidstone mass total = {debug(p_unseen_lid, n0_lid, seen_probs_lid):.12f}", file=sys.stderr)
+
+    # Held-out mass over S^T:
+    n0_ho = VOCAB_SIZE - len(counts_ST)
+    p_unseen_ho = heldout_prob("unseen-word", counts_ST, n_r, t_r, len(S_H))
+    seen_probs_ho = (heldout_prob(w, counts_ST, n_r, t_r, len(S_H)) for w in counts_ST.keys())
+    print(f"[debug] Held-out mass total = {debug(p_unseen_ho, n0_ho, seen_probs_ho):.12f}", file=sys.stderr)
+
+    # ------------------
+    # Evaluate on test set
+    # ------------------
+    test_events = development_set_preprocessing(args.test_set)
+    OUT[24] = len(test_events)  # Output25
+
+    # Lidstone on test: train on FULL dev set with the selected lambda
+    counts_dev_full = Counter(dev_events)
+    N_dev_full = len(dev_events)
+    OUT[25] = perplexity_unigram(test_events, lambda w: lidstone_prob(w, counts, train_size, best_lam, VOCAB_SIZE))  # Output26
+
+    # Held-out perplexity on test: use held-out probabilities learned from S^T/S^H
+    OUT[26] = perplexity_unigram(test_events, lambda w: heldout_prob(w, counts_ST, n_r, t_r, len(S_H)))  # Output27
+
+    OUT[27] = "L" if OUT[25] < OUT[26] else "H"  # Output28
+
+    # ------------------
+    # Output29 table (r=0..9) from the held-out estimation (S^T/S^H) + best lambda
+    # ------------------
+    table = build_table_29(train_size, len(S_T),len(S_H), n_r, t_r, best_lam, VOCAB_SIZE)
+
+    # Write output file
+    write_output(args.output_file, OUT, table)
 
 if __name__ == "__main__":
-    args = init()
-    print(args)
-    dev_set = development_set_preprocessing(args.dev_set)
-    counts_train, n_r, t_r, ho_set_len = held_out_model_training(dev_set, args.input_word)
-
-    # degug held-out unigram model
-    n0 = VOCAB_SIZE - len(counts_train)
-    p_unseen = unigram_prob_held_out('unseen-word', counts_train, n_r, t_r, ho_set_len)
-    seen_probs = [unigram_prob_held_out(word, counts_train, n_r, t_r, ho_set_len) 
-                for word in counts_train]
-
-    debug(p_unseen, n0, seen_probs)
-    write_to_file()
-
+    main()
