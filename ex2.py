@@ -24,15 +24,11 @@ def development_set_preprocessing(path: str) -> List[str]:
         sys.exit(1)
     return events
 
-# ---------------------------
-# Unigram probabilities
-# ---------------------------
 def mle_prob(word: str, counts: Counter, N: int) -> float:
     """Unigram MLE: p(x)=c(x)/N."""
     if N == 0: # empty training set
         return 0.0
     return counts.get(word, 0) / N
-
 
 def lidstone_prob(word: str, counts: Counter, N: int, lam: float, V: int = VOCAB_SIZE) -> float:
     """
@@ -44,7 +40,6 @@ def lidstone_prob(word: str, counts: Counter, N: int, lam: float, V: int = VOCAB
     if denom == 0:
         return 0.0
     return (counts.get(word, 0) + lam) / denom
-
 
 def heldout_parameters(train_counts: Counter, heldout_counts: Counter, V: int = VOCAB_SIZE) -> Tuple[Dict[int, int], Dict[int, int]]:
     """
@@ -70,7 +65,6 @@ def heldout_parameters(train_counts: Counter, heldout_counts: Counter, V: int = 
 
     return n_r, t_r
 
-
 def heldout_prob(word: str, train_counts: Counter, n_r: Dict[int, int], t_r: Dict[int, int], H_size: int) -> float:
     """
     Held-out unigram probability:
@@ -79,10 +73,6 @@ def heldout_prob(word: str, train_counts: Counter, n_r: Dict[int, int], t_r: Dic
     r = train_counts.get(word, 0)
     return t_r.get(r, 0) / (n_r.get(r, 0) * H_size)
 
-
-# ---------------------------
-# Perplexity
-# ---------------------------
 def perplexity_unigram(events: List[str], prob_fn) -> float:
     """
     Perplexity = exp( - (1/n) * sum_i log p(w_i) )
@@ -100,15 +90,10 @@ def perplexity_unigram(events: List[str], prob_fn) -> float:
         log_sum += math.log(p)
     return math.exp(-log_sum / n)
 
-
-# ---------------------------
-# Splits and search
-# ---------------------------
 def split_90_10(events: List[str]) -> Tuple[List[str], List[str]]:
     """Train = first round(0.9*|S|) events, Validation = rest."""
     cut = int(round(0.9 * len(events)))
     return events[:cut], events[cut:]
-
 
 def grid_search_lambda(train_counts: Counter, train_size: int, validation: List[str], V: int = VOCAB_SIZE) -> Tuple[float, float]:
     """
@@ -126,18 +111,14 @@ def grid_search_lambda(train_counts: Counter, train_size: int, validation: List[
     return best_lam, best_pp
 
 
-# ---------------------------
-# Debug mass check
-# ---------------------------
+# Debug probability mass check
 def debug(p_unseen: float, n0: int, seen_probs: Iterable[float]) -> float:
     """Return total probability mass: p_unseen*n0 + sum_{seen} p(x)."""
     sum_seen = sum(seen_probs)
     total_prob = (p_unseen * n0) + sum_seen
     return total_prob
 
-# ---------------------------
 # Output29 table
-# ---------------------------
 def build_table_29(
     train_size: int,
     N_ST: int,
@@ -175,13 +156,9 @@ def build_table_29(
         f_ho = p_ho * N_ST
 
         rows.append([f_mle, f_lid, f_ho, ntr, tr])
-
     return rows
 
-
-# ---------------------------
 # Writing output
-# ---------------------------
 def write_output(path: str, outputs: List, table: List[List[float]]) -> None:
     """
     Output file format (tab-delimited):
@@ -208,10 +185,7 @@ def write_output(path: str, outputs: List, table: List[List[float]]) -> None:
                 ) + "\n"
 )
 
-
-# ---------------------------
 # Main
-# ---------------------------
 def main() -> None:
 
     parser = argparse.ArgumentParser(description="Smoothing methods for Unigram model")
@@ -260,9 +234,7 @@ def main() -> None:
     OUT[18] = best_lam
     OUT[19] = best_pp
 
-    # ------------------
     # Held-out: split dev into halves
-    # ------------------
     half = len(dev_events) // 2
     S_T = dev_events[:half]
     S_H = dev_events[half:]
@@ -276,9 +248,7 @@ def main() -> None:
     OUT[22] = heldout_prob(args.input_word, counts_ST, n_r, t_r, len(S_H))   # Output23
     OUT[23] = heldout_prob("unseen-word", counts_ST, n_r, t_r, len(S_H))     # Output24
 
-    # ------------------
     # Debug: probability mass sums to 1 (prints to stderr; doesn't affect output format)
-    # ------------------
     # Lidstone (best lambda) mass over the 90% training corpus:
     n0_lid = VOCAB_SIZE - len(counts)
     p_unseen_lid = lidstone_prob("unseen-word", counts, train_size, best_lam, VOCAB_SIZE)
@@ -291,25 +261,19 @@ def main() -> None:
     seen_probs_ho = (heldout_prob(w, counts_ST, n_r, t_r, len(S_H)) for w in counts_ST.keys())
     print(f"[debug] Held-out mass total = {debug(p_unseen_ho, n0_ho, seen_probs_ho):.12f}", file=sys.stderr)
 
-    # ------------------
     # Evaluate on test set
-    # ------------------
     test_events = development_set_preprocessing(args.test_set)
     OUT[24] = len(test_events)  # Output25
 
-    # Lidstone on test: train on FULL dev set with the selected lambda
-    counts_dev_full = Counter(dev_events)
-    N_dev_full = len(dev_events)
+    # Lidstone perplexity on test: use the model trained on the 90% training corpus only with the selected lambda
     OUT[25] = perplexity_unigram(test_events, lambda w: lidstone_prob(w, counts, train_size, best_lam, VOCAB_SIZE))  # Output26
 
-    # Held-out perplexity on test: use held-out probabilities learned from S^T/S^H
+    # Held-out perplexity on test: use held-out probabilities learned from S^T, S^H
     OUT[26] = perplexity_unigram(test_events, lambda w: heldout_prob(w, counts_ST, n_r, t_r, len(S_H)))  # Output27
 
     OUT[27] = "L" if OUT[25] < OUT[26] else "H"  # Output28
 
-    # ------------------
-    # Output29 table (r=0..9) from the held-out estimation (S^T/S^H) + best lambda
-    # ------------------
+    # Output29 table
     table = build_table_29(train_size, len(S_T),len(S_H), n_r, t_r, best_lam, VOCAB_SIZE)
 
     # Write output file
